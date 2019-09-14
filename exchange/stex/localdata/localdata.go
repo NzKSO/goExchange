@@ -1,6 +1,7 @@
 package localdata
 
 import (
+	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
@@ -11,8 +12,38 @@ import (
 
 const currencyPairsInfoFile = "currencyPairsInfo.json"
 
+type currencyPairMap map[string]*model.CurrencyPair
+
+func (m *currencyPairMap) UnmarshalJSON(data []byte) error {
+	if *m == nil {
+		*m = make(currencyPairMap)
+	}
+
+	dec := json.NewDecoder(bytes.NewReader(data))
+
+	_, err := dec.Token()
+	if err != nil {
+		return err
+	}
+
+	for dec.More() {
+		var pair model.CurrencyPair
+		if err = dec.Decode(&pair); err != nil {
+			return err
+		}
+		(*m)[pair.Symbol] = &pair
+	}
+
+	_, err = dec.Token()
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 // AllCurrencyPairs contain all information related to currency pair in stex
-var AllCurrencyPairs map[string]*model.CurrencyPair
+var AllCurrencyPairs currencyPairMap
 
 func init() {
 	_, file, _, ok := runtime.Caller(0)
@@ -25,15 +56,7 @@ func init() {
 		panic(err)
 	}
 
-	var allCurrencyPairs []model.CurrencyPair
-
-	if err = json.Unmarshal(data, &allCurrencyPairs); err != nil {
+	if err = json.Unmarshal(data, &AllCurrencyPairs); err != nil {
 		panic(err)
-	}
-
-	AllCurrencyPairs = make(map[string]*model.CurrencyPair)
-
-	for i := range allCurrencyPairs {
-		AllCurrencyPairs[allCurrencyPairs[i].Symbol] = &allCurrencyPairs[i]
 	}
 }
